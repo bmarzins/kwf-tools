@@ -1,5 +1,26 @@
 #!/usr/bin/python3
 
+# File format for files in the <patch_dir> directory, by line
+# Note: All files must use the same length commit SHA, so commits
+# in upstream-commits.txt will exactly string match the commits in
+# bz-commits-map.txt and dm-commits.txt
+#
+# upstream-commits.txt:
+# <at_least_12_digits_of_commit_sha><space_or_EOL>
+#
+# default-bz.txt:
+# <7_digit_bugzilla_nr><space_or_EOL>
+#
+# bz-commits-map.txt:
+# Once a line has set at least one bz, future lines don't need to.
+# If a line doesn't include any bzs, the bzs from the last line
+# that included some will be used.
+# <at_least_12_digits_of_commit_sha>[<space><7_digit_bugzilla_nr>][...]
+#
+# dm-commits.txt:
+# <at_least_12_digits_of_commit_sha><space_or_EOL>
+#
+
 import sys
 import os
 import re
