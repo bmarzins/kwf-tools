@@ -3,7 +3,7 @@
 # File format for files in the <patch_dir> directory, by line
 # Note: All files must use the same length commit SHA, so commits
 # in upstream-commits.txt will exactly string match the commits in
-# bz-commits-map.txt and dm-commits.txt
+# bz-commits-map.txt and upstream-repo-map.txt
 #
 # upstream-commits.txt:
 # <at_least_12_digits_of_commit_sha><space_or_EOL>
@@ -17,8 +17,8 @@
 # that included some will be used.
 # <at_least_12_digits_of_commit_sha>[<space><7_digit_bugzilla_nr>][...]
 #
-# dm-commits.txt:
-# <at_least_12_digits_of_commit_sha><space_or_EOL>
+# upstream-repo-map.txt:
+# <at_least_12_digits_of_commit_sha><space><upstream_repo_text>
 #
 
 import sys
@@ -90,7 +90,7 @@ user_email = get_cmd_output(dest_git + ["config", "--get", "user.email"]).rstrip
 commits_path = os.path.join(patch_dir, "upstream-commits.txt")
 default_bz_path = os.path.join(patch_dir, "default-bz.txt")
 bzs_map_path = os.path.join(patch_dir, "bz-commits-map.txt")
-dm_commits_path = os.path.join(patch_dir, "dm-commits.txt")
+upstream_map_path = os.path.join(patch_dir, "upstream-repo-map.txt")
 
 if not os.path.isfile(commits_path):
     print("Err:", commits_file, "doesn't exist")
@@ -143,22 +143,31 @@ if os.path.isfile(bzs_map_path):
                 continue
             bzs_map[bz_commit] = curr_bzs
 
-commit_pattern = re.compile(r'^\s*([0-9a-f]{12,40})(?:\s|$)')
+upstream_pattern = re.compile(r'^\s*([0-9a-f]{12,40})(?:\s+([^\s#][^#]*?))?\s*(?:#|$)')
 
 line_nr = 0
-dm_commits = set()
-if os.path.isfile(dm_commits_path):
-    with open(dm_commits_path) as dm_commits_file:
-        for line in dm_commits_file:
+upstream_map = {}
+curr_upstream = None
+if os.path.isfile(upstream_map_path):
+    with open(upstream_map_path) as upstream_map_file:
+        for line in upstream_map_file:
             line_nr += 1
             line = line.rstrip()
             if skip_pattern.match(line):
                 continue
-            result = commit_pattern.match(line)
+            result = upstream_pattern.match(line)
             if result == None:
-                print(f'{dm_commits_path}: invalid line at {line_nr}: "{line}"')
+                print(f'{upstream_map_path}: invalid line at {line_nr}: "{line}"')
                 continue
-            dm_commits.add(result.group(1))
+            upstream_commit = result.group(1)
+            if result.group(2) != None:
+                curr_upstream = result.group(2)
+            if curr_upstream == None:
+                print(f'{upstream_map_path}: bad line at {line_nr}. No upstream listed here or previously')
+                continue
+            upstream_map[upstream_commit] = curr_upstream
+
+commit_pattern = re.compile(r'^\s*([0-9a-f]{12,40})(?:\s|$)')
 
 patch_nr = 0
 line_nr = 0
@@ -185,9 +194,9 @@ with open(commits_path) as commits_file:
             bugs = def_bzs
         for bz in bugs:
             patch_data += f"Bugzilla: https://bugzilla.redhat.com/{bz}\n"
-        if commit_id in dm_commits:
-            patch_data += f"Upstream Status: kernel/git/device-mapper/linux-dm.git\n\n"
-            dm_commits.remove(commit_id)
+        if commit_id in upstream_map:
+            patch_data += f"Upstream Status: {upstream_map[commit_id]}\n\n"
+            del upstream_map[commit_id]
         else:
             patch_data += f"Upstream Status: kernel/git/torvalds/linux.git\n\n"
         patch_data += get_cmd_output(src_git + ["show", commit_id, "-s"])
@@ -196,7 +205,7 @@ with open(commits_path) as commits_file:
         with open(file_path, 'w') as patch_file:
             patch_file.write(patch_data)
 
-for commit_id in dm_commits:
-    print(f"Warning: unused commit id {commit_id} in {dm_commits_path}")
+for commit_id in upstream_map:
+    print(f"Warning: unused commit id {commit_id} in {upstream_map_path}")
 for commit_id in bzs_map:
     print(f"Warning: unused commit id {commit_id} in {bzs_map_path}")
