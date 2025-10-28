@@ -3,19 +3,19 @@
 # File format for files in the <patch_dir> directory, by line
 # Note: All files must use the same length commit SHA, so commits
 # in upstream-commits.txt will exactly string match the commits in
-# bz-commits-map.txt and upstream-repo-map.txt
+# jira-commits-map.txt and upstream-repo-map.txt
 #
 # upstream-commits.txt:
 # <at_least_12_digits_of_commit_sha><space_or_EOL>
 #
-# default-bz.txt:
-# <7_digit_bugzilla_nr><space_or_EOL>
+# default-jira.txt:
+# RHEL-<issue_nr><space_or_EOL>
 #
-# bz-commits-map.txt:
-# Once a line has set at least one bz, future lines don't need to.
-# If a line doesn't include any bzs, the bzs from the last line
+# jira-commits-map.txt:
+# Once a line has set at least one issue, future lines don't need to.
+# If a line doesn't include any issues, the issues from the last line
 # that included some will be used.
-# <at_least_12_digits_of_commit_sha>[<space><7_digit_bugzilla_nr>][...]
+# <at_least_12_digits_of_commit_sha>[<space>RHEL-<issue_nr>][...]
 #
 # upstream-repo-map.txt:
 # <at_least_12_digits_of_commit_sha><space><upstream_repo_text>
@@ -88,8 +88,8 @@ user_name = get_cmd_output(dest_git + ["config", "--get", "user.name"]).rstrip()
 user_email = get_cmd_output(dest_git + ["config", "--get", "user.email"]).rstrip()
 
 commits_path = os.path.join(patch_dir, "upstream-commits.txt")
-default_bz_path = os.path.join(patch_dir, "default-bz.txt")
-bzs_map_path = os.path.join(patch_dir, "bz-commits-map.txt")
+default_jira_path = os.path.join(patch_dir, "default-jira.txt")
+jira_map_path = os.path.join(patch_dir, "jira-commits-map.txt")
 upstream_map_path = os.path.join(patch_dir, "upstream-repo-map.txt")
 
 if not os.path.isfile(commits_path):
@@ -97,51 +97,51 @@ if not os.path.isfile(commits_path):
     sys.exit(1)
 
 skip_pattern = re.compile(r'^\s*(?:#|$)')
-def_bz_pattern = re.compile(r'^\s*([0-9]{7})(?:\s|$)')
+def_jira_pattern = re.compile(r'^\s*(RHEL-[0-9]+)(?:\s|$)')
 
-if not os.path.isfile(default_bz_path):
-    print("Err:", default_bz, "doesn't exist")
+if not os.path.isfile(default_jira_path):
+    print("Err:", default_jira_path, "doesn't exist")
     sys.exit(1)
 
 line_nr = 0
-def_bzs = []
-with open(default_bz_path) as default_bz_file:
-    for line in default_bz_file:
+def_jira = []
+with open(default_jira_path) as default_jira_file:
+    for line in default_jira_file:
         line_nr += 1
         line = line.rstrip()
         if skip_pattern.match(line):
             continue
-        result = def_bz_pattern.match(line)
+        result = def_jira_pattern.match(line)
         if result == None:
-            print(f'{default_bz_path}: invalid line at {line_nr}: "{line}"')
+            print(f'{default_jira_path}: invalid line at {line_nr}: "{line}"')
             continue
-        def_bzs.append(result.group(1))
+        def_jira.append(result.group(1))
 
-bzs_commit_pattern = re.compile(r'^\s*([0-9a-f]{12,40})((?:\s+[0-9]{7})*)\s*(?:#|$)')
-bzs_pattern = re.compile(r'[0-9]{7}')
+jira_commit_pattern = re.compile(r'^\s*([0-9a-f]{12,40})((?:\s+RHEL-[0-9]+)*)\s*(?:#|$)')
+jira_pattern = re.compile(r'RHEL-[0-9]+')
 
 line_nr = 0
-bzs_map = {}
-curr_bzs = []
-if os.path.isfile(bzs_map_path):
-    with open(bzs_map_path) as bzs_map_file:
-        for line in bzs_map_file:
+jira_map = {}
+curr_issues = []
+if os.path.isfile(jira_map_path):
+    with open(jira_map_path) as jira_map_file:
+        for line in jira_map_file:
             line_nr += 1
             line = line.rstrip()
             if skip_pattern.match(line):
                 continue
-            result = bzs_commit_pattern.match(line)
+            result = jira_commit_pattern.match(line)
             if result == None:
-                print(f'{bzs_map_path}: invalid line at {line_nr}: "{line}"')
+                print(f'{jira_map_path}: invalid line at {line_nr}: "{line}"')
                 continue
-            bz_commit = result.group(1)
-            bug_match = result.group(2)
-            if bug_match != "":
-                curr_bzs = bzs_pattern.findall(bug_match)
-            elif curr_bzs == []:
-                print(f'{bzs_map_path}: bad line at {line_nr}. No bugs listed here or previously')
+            jira_commit = result.group(1)
+            issue_match = result.group(2)
+            if issue_match != "":
+                curr_issues = jira_pattern.findall(issue_match)
+            elif curr_issues == []:
+                print(f'{jirs_map_path}: bad line at {line_nr}. No issuess listed here or previously')
                 continue
-            bzs_map[bz_commit] = curr_bzs
+            jira_map[jira_commit] = curr_issues
 
 upstream_pattern = re.compile(r'^\s*([0-9a-f]{12,40})(?:\s+([^\s#][^#]*?))?\s*(?:#|$)')
 
@@ -187,13 +187,13 @@ with open(commits_path) as commits_file:
         file_path = os.path.join(patch_dir, f"{patch_nr:04}-{file_base[:52]}.patch")
         patch_data = f"From: {user_name} <{user_email}>\n"
         patch_data += f"Subject: {subject}\n\n"
-        if commit_id in bzs_map:
-            bugs = bzs_map[commit_id]
-            del bzs_map[commit_id]
+        if commit_id in jira_map:
+            jiras = jira_map[commit_id]
+            del jira_map[commit_id]
         else:
-            bugs = def_bzs
-        for bz in bugs:
-            patch_data += f"Bugzilla: https://bugzilla.redhat.com/{bz}\n"
+            jiras = def_jira
+        for jira in jiras:
+            patch_data += f"JIRA: https://issues.redhat.com/browse/{jira}\n"
         if commit_id in upstream_map:
             patch_data += f"Upstream Status: {upstream_map[commit_id]}\n\n"
             del upstream_map[commit_id]
@@ -207,5 +207,5 @@ with open(commits_path) as commits_file:
 
 for commit_id in upstream_map:
     print(f"Warning: unused commit id {commit_id} in {upstream_map_path}")
-for commit_id in bzs_map:
-    print(f"Warning: unused commit id {commit_id} in {bzs_map_path}")
+for commit_id in jira_map:
+    print(f"Warning: unused commit id {commit_id} in {jira_map_path}")
