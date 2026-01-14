@@ -93,7 +93,7 @@ jira_map_path = os.path.join(patch_dir, "jira-commits-map.txt")
 upstream_map_path = os.path.join(patch_dir, "upstream-repo-map.txt")
 
 if not os.path.isfile(commits_path):
-    print("Err:", commits_file, "doesn't exist")
+    print("Err:", commits_path, "doesn't exist")
     sys.exit(1)
 
 skip_pattern = re.compile(r'^\s*(?:#|$)')
