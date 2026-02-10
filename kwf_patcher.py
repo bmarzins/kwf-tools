@@ -12,13 +12,18 @@
 # RHEL-<issue_nr><space_or_EOL>
 #
 # jira-commits-map.txt:
+# <at_least_12_digits_of_commit_sha>[<space>RHEL-<issue_nr>]*
 # Once a line has set at least one issue, future lines don't need to.
 # If a line doesn't include any issues, the issues from the last line
 # that included some will be used.
-# <at_least_12_digits_of_commit_sha>[<space>RHEL-<issue_nr>][...]
 #
 # upstream-repo-map.txt:
-# <at_least_12_digits_of_commit_sha><space><upstream_repo_text>
+# <at_least_12_digits_of_commit_sha>[<space><upstream_repo_text>]?
+# Once a line has set and upstream repo, future lines don't need to.
+# If a line doesn't include at repo, the repo from the last line
+# that included one will be used.
+# "upstream_repo_text" should look something like
+# "kernel/git/device-mapper/linux-dm.git"
 #
 
 import sys
